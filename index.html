@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Infini Cube</title>
+    <style>
+      :root {
+        --rotationX: 0deg;
+        --rotationY: 0deg;
+      }
+
+      img {
+        position: absolute;
+        bottom: 5px;
+        left: 5px;
+        width: 100px;
+      }
+
+      body {
+        padding: 0;
+        margin: 0;
+      }
+
+      #wrapper {
+        --perspective: 700px;
+        position: absolute;
+        width: 100vw;
+        height: 100vh;
+        perspective-origin: center;
+        perspective: var(--perspective);
+        -webkit-perspective: var(--perspective);
+      }
+
+      .cube {
+        --padding: 50px;
+        --size: 150px;
+        --center-x: calc(50vw - var(--size) / 2);
+        --center-y: calc(50vh - var(--size) / 2);
+        position: absolute;
+        width: var(--size);
+        height: var(--size);
+        transition: none;
+        transform-style: preserve-3d;
+        transform: translateX(var(--center-x)) translateY(var(--center-y))
+          rotateX(var(--rotationX)) rotateY(var(--rotationY));
+      }
+
+      .cube.animate {
+        transition: all 0.5s ease-out;
+      }
+
+      .cube div {
+        position: absolute;
+        width: var(--size);
+        height: var(--size);
+        background: white;
+        box-sizing: border;
+        border: 1px black solid;
+      }
+
+      .cube div:nth-child(1) {
+        transform: translateZ(75px);
+      }
+
+      .cube div:nth-child(2) {
+        transform: rotateY(-90deg) translateZ(75px);
+      }
+
+      .cube div:nth-child(3) {
+        transform: rotateY(90deg) translateZ(75px);
+      }
+
+      .cube div:nth-child(4) {
+        transform: rotateX(90deg) translateZ(75px);
+      }
+
+      .cube div:nth-child(5) {
+        transform: rotateX(-90deg) translateZ(75px);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="wrapper">
+      <div class="cube animate">
+        <div id="front">
+          <!--Front-->
+        </div>
+        <div id="left">
+          <!--Left-->
+        </div>
+        <div id="right">
+          <!--Right-->
+        </div>
+        <div id="top">
+          <!--Top-->
+        </div>
+        <div id="bottom">
+          <!--Bottom-->
+        </div>
+      </div>
+    </div>
+
+    <img
+      src="https://i.imgur.com/43hKZlW.png"
+      alt="Use the arrow keys"
+      title="Use the arrow keys"
+    />
+
+    <script src="https://unpkg.com/xstate@4.7.5/dist/xstate.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/olian04/easy-css-variables/src/index.js"></script>
+    <script>
+      const { Machine, actions, interpret } = XState;
+
+      // Stateless machine definition
+      const roomMachine = Machine(
+        {
+          id: "rooms",
+          initial: "home",
+          context: {
+            cube: {
+              self: document.querySelector(".cube"),
+              front: document.querySelector("#front"),
+              right: document.querySelector("#right"),
+              left: document.querySelector("#left"),
+              top: document.querySelector("#top"),
+              bottom: document.querySelector("#bottom")
+            }
+          },
+          states: {
+            home: {
+              entry: ["loadRoom"],
+              on: {
+                UP: {
+                  target: "attic",
+                  actions: ["transitionUp"]
+                },
+                LEFT: {
+                  target: "porch",
+                  actions: ["transitionLeft"]
+                },
+                RIGHT: {
+                  target: "yard",
+                  actions: ["transitionRight"]
+                },
+                DOWN: {
+                  target: "basement",
+                  actions: ["transitionDown"]
+                }
+              }
+            },
+            basement: {
+              entry: ["loadRoom"],
+              on: {
+                UP: {
+                  target: "home",
+                  actions: ["transitionUp"]
+                },
+                DOWN: {
+                  target: "secret laboratory",
+                  actions: ["transitionDown"]
+                }
+              }
+            },
+            "secret laboratory": {
+              entry: ["loadRoom"],
+              on: {
+                UP: {
+                  target: "basement",
+                  actions: ["transitionUp"]
+                },
+                LEFT: {
+                  target: "room of vials",
+                  actions: ["transitionLeft"]
+                },
+                RIGHT: {
+                  target: "prison cells",
+                  actions: ["transitionRight"]
+                }
+              }
+            },
+            "room of vials": {
+              entry: ["loadRoom"],
+              on: {
+                RIGHT: {
+                  target: "secret laboratory",
+                  actions: ["transitionRight"]
+                }
+              }
+            },
+            "prison cells": {
+              entry: ["loadRoom"],
+              on: {
+                LEFT: {
+                  target: "secret laboratory",
+                  actions: ["transitionLeft"]
+                }
+              }
+            },
+            porch: {
+              entry: ["loadRoom"],
+              on: {
+                RIGHT: {
+                  target: "home",
+                  actions: ["transitionRight"]
+                },
+                LEFT: {
+                  target: "yard",
+                  actions: ["transitionLeft"]
+                }
+              }
+            },
+            yard: {
+              entry: ["loadRoom"],
+              on: {
+                LEFT: {
+                  target: "home",
+                  actions: ["transitionLeft"]
+                },
+                RIGHT: {
+                  target: "porch",
+                  actions: ["transitionRight"]
+                }
+              }
+            },
+            attic: {
+              entry: ["loadRoom"],
+              on: {
+                UP: {
+                  target: "roof",
+                  actions: ["transitionUp"]
+                },
+                DOWN: {
+                  target: "home",
+                  actions: ["transitionDown"]
+                }
+              }
+            },
+            roof: {
+              entry: ["loadRoom"],
+              on: {
+                DOWN: {
+                  target: "attic",
+                  actions: ["transitionDown"]
+                }
+              }
+            }
+          }
+        },
+        {
+          actions: {
+            loadRoom: (context, event, meta) => {
+              if (event.type === "xstate.init") {
+                context.cube.front.innerHTML = meta.state.value;
+                return;
+              }
+              const targetMap = {
+                UP: context.cube.top,
+                DOWN: context.cube.bottom,
+                LEFT: context.cube.left,
+                RIGHT: context.cube.right
+              };
+              targetMap[event.type].innerHTML = meta.state.value;
+
+              setTimeout(() => {
+                context.cube.front.innerHTML = targetMap[event.type].innerHTML;
+                context.cube.self.classList.remove("animate");
+                ecv.rotationX = `0deg`;
+                ecv.rotationY = `0deg`;
+
+                setTimeout(() => {
+                  context.cube.self.classList.add("animate");
+
+                  // cleanup
+                  targetMap[event.type].innerHTML = "";
+                }, 1);
+              }, 550);
+            },
+            transitionUp: (context, event, meta) => {
+              ecv.rotationX = `-90deg`;
+            },
+            transitionDown: (context, event, meta) => {
+              ecv.rotationX = `90deg`;
+            },
+            transitionLeft: (context, event, meta) => {
+              ecv.rotationY = `90deg`;
+            },
+            transitionRight: (context, event, meta) => {
+              ecv.rotationY = `-90deg`;
+            }
+          }
+        }
+      );
+
+      const inputDelay = 550;
+      let lastInputTime = 0;
+      const roomService = interpret(roomMachine)
+        .onTransition(state => {
+          if (state.changed) {
+            lastInputTime = Date.now();
+          }
+        })
+        .start();
+
+      document.addEventListener("keydown", ev => {
+        if (Date.now() - lastInputTime < inputDelay) {
+          return;
+        }
+        const key = ev.code;
+        if (key === "ArrowUp") {
+          roomService.send("UP");
+        } else if (key === "ArrowDown") {
+          roomService.send("DOWN");
+        } else if (key === "ArrowLeft") {
+          roomService.send("LEFT");
+        } else if (key === "ArrowRight") {
+          roomService.send("RIGHT");
+        }
+      });
+    </script>
+  </body>
+</html>
