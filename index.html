@@ -110,6 +110,7 @@
 
     <script src="https://unpkg.com/xstate@4.7.5/dist/xstate.js"></script>
     <script src="https://cdn.jsdelivr.net/gh/olian04/easy-css-variables/src/index.js"></script>
+    <script src="https://hammerjs.github.io/dist/hammer.js"></script>
     <script>
       const { Machine, actions, interpret } = XState;
 
@@ -302,6 +303,30 @@
           }
         })
         .start();
+      
+      const hammer = new Hammer(document.body);
+
+      hammer.get('swipe').set({
+          direction: Hammer.DIRECTION_ALL
+      });
+
+      // listen to events...
+      hammer.on("swipeup", (ev) => {
+        if (event.pointerType !== 'touch') { return; }
+        roomService.send('DOWN');
+      });
+      hammer.on("swipedown", (ev) => {
+        if (event.pointerType !== 'touch') { return; }
+        roomService.send('UP');
+      });
+      hammer.on("swipeleft", (ev) => {
+        if (event.pointerType !== 'touch') { return; }
+        roomService.send('RIGHT');
+      });
+      hammer.on("swiperight", (ev) => {
+        if (event.pointerType !== 'touch') { return; }
+        roomService.send('LEFT');
+      });
 
       document.addEventListener("keydown", ev => {
         if (Date.now() - lastInputTime < inputDelay) {
