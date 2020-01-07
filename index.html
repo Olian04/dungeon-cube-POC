@@ -34,8 +34,7 @@
       }
 
       .cube {
-        --padding: 50px;
-        --size: 150px;
+        --size: calc(min(100vh, 100vw) * 0.5);
         --center-x: calc(50vw - var(--size) / 2);
         --center-y: calc(50vh - var(--size) / 2);
         position: absolute;
@@ -52,6 +51,7 @@
       }
 
       .cube div {
+        --offset: calc(var(--size) / 2);
         position: absolute;
         width: var(--size);
         height: var(--size);
@@ -61,23 +61,23 @@
       }
 
       .cube div:nth-child(1) {
-        transform: translateZ(75px);
+        transform: translateZ(var(--offset));
       }
 
       .cube div:nth-child(2) {
-        transform: rotateY(-90deg) translateZ(75px);
+        transform: rotateY(-90deg) translateZ(var(--offset));
       }
 
       .cube div:nth-child(3) {
-        transform: rotateY(90deg) translateZ(75px);
+        transform: rotateY(90deg) translateZ(var(--offset));
       }
 
       .cube div:nth-child(4) {
-        transform: rotateX(90deg) translateZ(75px);
+        transform: rotateX(90deg) translateZ(var(--offset));
       }
 
       .cube div:nth-child(5) {
-        transform: rotateX(-90deg) translateZ(75px);
+        transform: rotateX(-90deg) translateZ(var(--offset));
       }
     </style>
   </head>
