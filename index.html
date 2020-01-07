@@ -313,18 +313,30 @@
       // listen to events...
       hammer.on("swipeup", (ev) => {
         if (event.pointerType !== 'touch') { return; }
+        if (Date.now() - lastInputTime < inputDelay) {
+          return;
+        }
         roomService.send('DOWN');
       });
       hammer.on("swipedown", (ev) => {
         if (event.pointerType !== 'touch') { return; }
+        if (Date.now() - lastInputTime < inputDelay) {
+          return;
+        }
         roomService.send('UP');
       });
       hammer.on("swipeleft", (ev) => {
         if (event.pointerType !== 'touch') { return; }
+        if (Date.now() - lastInputTime < inputDelay) {
+          return;
+        }
         roomService.send('RIGHT');
       });
       hammer.on("swiperight", (ev) => {
         if (event.pointerType !== 'touch') { return; }
+        if (Date.now() - lastInputTime < inputDelay) {
+          return;
+        }
         roomService.send('LEFT');
       });
 
