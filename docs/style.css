@@ -3,6 +3,11 @@
   --rotationY: 0deg;
 }
 
+.heading {
+  position: relative;
+  text-align: center;
+}
+
 img {
   position: absolute;
   bottom: 5px;

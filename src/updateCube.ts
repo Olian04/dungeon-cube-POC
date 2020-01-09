@@ -1,4 +1,5 @@
-import { render } from 'brynja';
+import { render, extend } from 'brynja';
+import { buildHome } from './rooms/home';
 
 interface IState {
   doAnimation: boolean;
@@ -15,6 +16,25 @@ interface IState {
   };
 };
 
+const rooms = {
+  'home': buildHome
+}
+
+extend('setContent', (contentKey: string) => _=> {
+  const found = contentKey in rooms;
+  if (found) {
+    return rooms[contentKey](_);
+  } else {
+
+    // Default fallback builder
+    return _
+      .child('h1', _=>_
+        .class([ 'heading' ])
+        .text(contentKey)
+      );
+  }
+});
+
 export const updateCube = (state: IState, onTransitioned: (ev: Event) => void = () => {}) => {
   render(_=>_
     .prop('style', `
@@ -30,23 +50,23 @@ export const updateCube = (state: IState, onTransitioned: (ev: Event) => void = 
       .on('transitionend', onTransitioned)
       .child('div', _=>_
         .id('front')
-        .text(state.content.FRONT)
+        .setContent(state.content.FRONT)
       )
       .child('div', _=>_
         .id('left')
-        .text(state.content.LEFT)
+        .setContent(state.content.LEFT)
       )
       .child('div', _=>_
         .id('right')
-        .text(state.content.RIGHT)
+        .setContent(state.content.RIGHT)
       )
       .child('div', _=>_
         .id('top')
-        .text(state.content.UP)
+        .setContent(state.content.UP)
       )
       .child('div', _=>_
         .id('bottom')
-        .text(state.content.DOWN)
+        .setContent(state.content.DOWN)
       )
     )
   )
