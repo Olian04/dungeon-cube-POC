@@ -18,7 +18,8 @@ export const roomMachine = Machine(
       rotate: {
         x: 0,
         y: 0,
-      }
+      },
+      resetInputStop: () => {},
     },
     states: {
       home: {
@@ -151,17 +152,20 @@ export const roomMachine = Machine(
         const target = event.type;
 
         context.content[target] = meta.state.value.toString();
-        updateCube(context, (ev) => {
+        updateCube(context, () => {
+
           context.doAnimation = false;
           updateCube(context);
           context.content.FRONT = context.content[target];
           context.rotate.x = 0;
           context.rotate.y = 0;
           updateCube(context);
+
           setTimeout(() => {
             context.doAnimation = true;
             context.content[target] = '';
             updateCube(context);
+            context.resetInputStop();
           }, 1)
         });
       },

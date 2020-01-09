@@ -7778,7 +7778,8 @@
           rotate: {
               x: 0,
               y: 0,
-          }
+          },
+          resetInputStop: () => { },
       },
       states: {
           home: {
@@ -7908,7 +7909,7 @@
               }
               const target = event.type;
               context.content[target] = meta.state.value.toString();
-              updateCube(context, (ev) => {
+              updateCube(context, () => {
                   context.doAnimation = false;
                   updateCube(context);
                   context.content.FRONT = context.content[target];
@@ -7919,6 +7920,7 @@
                       context.doAnimation = true;
                       context.content[target] = '';
                       updateCube(context);
+                      context.resetInputStop();
                   }, 1);
               });
           },
@@ -7941,12 +7943,27 @@
       }
   });
 
-  const inputDelay = 550;
-  let lastInputTime = 0;
-  const roomService = interpret(roomMachine)
-      .onTransition(state => {
+  let swallowInput = false;
+  const roomService = interpret(roomMachine
+      .withContext({
+      doAnimation: true,
+      content: {
+          FRONT: 'home',
+          LEFT: '',
+          RIGHT: '',
+          UP: '',
+          DOWN: '',
+      },
+      rotate: {
+          x: 0,
+          y: 0,
+      },
+      resetInputStop: () => {
+          swallowInput = false;
+      },
+  })).onTransition(state => {
       if (state.changed) {
-          lastInputTime = Date.now();
+          swallowInput = true;
       }
   })
       .start();
@@ -7959,7 +7976,7 @@
       if (ev.pointerType !== 'touch') {
           return;
       }
-      if (Date.now() - lastInputTime < inputDelay) {
+      if (swallowInput) {
           return;
       }
       roomService.send('DOWN');
@@ -7968,7 +7985,7 @@
       if (ev.pointerType !== 'touch') {
           return;
       }
-      if (Date.now() - lastInputTime < inputDelay) {
+      if (swallowInput) {
           return;
       }
       roomService.send('UP');
@@ -7977,7 +7994,7 @@
       if (ev.pointerType !== 'touch') {
           return;
       }
-      if (Date.now() - lastInputTime < inputDelay) {
+      if (swallowInput) {
           return;
       }
       roomService.send('RIGHT');
@@ -7986,13 +8003,13 @@
       if (ev.pointerType !== 'touch') {
           return;
       }
-      if (Date.now() - lastInputTime < inputDelay) {
+      if (swallowInput) {
           return;
       }
       roomService.send('LEFT');
   });
   document.addEventListener("keydown", ev => {
-      if (Date.now() - lastInputTime < inputDelay) {
+      if (swallowInput) {
           return;
       }
       const key = ev.code;

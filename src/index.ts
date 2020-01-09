@@ -2,12 +2,29 @@ import { interpret } from 'xstate/es';
 import Hammer from 'hammerjs';
 import { roomMachine } from './stateMachine';
 
-const inputDelay = 550;
-let lastInputTime = 0;
-const roomService = interpret(roomMachine)
-  .onTransition(state => {
+let swallowInput = false;
+
+const roomService = interpret(roomMachine
+  .withContext({
+    doAnimation: true,
+    content: {
+      FRONT: 'home',
+      LEFT: '',
+      RIGHT: '',
+      UP: '',
+      DOWN: '',
+    },
+    rotate: {
+      x: 0,
+      y: 0,
+    },
+    resetInputStop: () => {
+      swallowInput = false;
+    },
+  })
+).onTransition(state => {
     if (state.changed) {
-      lastInputTime = Date.now();
+      swallowInput = true;
     }
   })
   .start();
@@ -21,37 +38,27 @@ hammer.get('swipe').set({
 // listen to events...
 hammer.on("swipeup", (ev) => {
   if (ev.pointerType !== 'touch') { return; }
-  if (Date.now() - lastInputTime < inputDelay) {
-    return;
-  }
+  if (swallowInput) { return; }
   roomService.send('DOWN');
 });
 hammer.on("swipedown", (ev) => {
   if (ev.pointerType !== 'touch') { return; }
-  if (Date.now() - lastInputTime < inputDelay) {
-    return;
-  }
+  if (swallowInput) { return; }
   roomService.send('UP');
 });
 hammer.on("swipeleft", (ev) => {
   if (ev.pointerType !== 'touch') { return; }
-  if (Date.now() - lastInputTime < inputDelay) {
-    return;
-  }
+  if (swallowInput) { return; }
   roomService.send('RIGHT');
 });
 hammer.on("swiperight", (ev) => {
   if (ev.pointerType !== 'touch') { return; }
-  if (Date.now() - lastInputTime < inputDelay) {
-    return;
-  }
+  if (swallowInput) { return; }
   roomService.send('LEFT');
 });
 
 document.addEventListener("keydown", ev => {
-  if (Date.now() - lastInputTime < inputDelay) {
-    return;
-  }
+  if (swallowInput) { return; }
   const key = ev.code;
   if (key === "ArrowUp") {
     roomService.send("UP");
