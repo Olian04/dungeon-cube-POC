@@ -6,7 +6,7 @@
           "esnext",
           "dom"
       ],
-      "outDir": "dist/js/",
+      "outDir": "docs/js",
       "declaration": true,
       "allowSyntheticDefaultImports": true,
       "esModuleInterop": true,

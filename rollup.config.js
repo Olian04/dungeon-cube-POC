@@ -5,7 +5,7 @@ import commonjs from 'rollup-plugin-commonjs';
 export default {
   input: './src/index.ts',
   output: {
-    file: './dist/js/index.js',
+    file: './docs/js/index.js',
     format: 'iife',
     name: 'infinity_cube'
   },
