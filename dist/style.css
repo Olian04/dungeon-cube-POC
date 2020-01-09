@@ -1,0 +1,73 @@
+:root {
+  --rotationX: 0deg;
+  --rotationY: 0deg;
+}
+
+img {
+  position: absolute;
+  bottom: 5px;
+  left: 5px;
+  width: 100px;
+}
+
+body {
+  padding: 0;
+  margin: 0;
+}
+
+#wrapper {
+  --perspective: 700px;
+  position: absolute;
+  width: 100vw;
+  height: 100vh;
+  perspective-origin: center;
+  perspective: var(--perspective);
+  -webkit-perspective: var(--perspective);
+}
+
+.cube {
+  --size: calc(min(100vh, 100vw) * 0.5);
+  --center-x: calc(50vw - var(--size) / 2);
+  --center-y: calc(50vh - var(--size) / 2);
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  transition: none;
+  transform-style: preserve-3d;
+  transform: translateX(var(--center-x)) translateY(var(--center-y))
+    rotateX(var(--rotationX)) rotateY(var(--rotationY));
+}
+
+.cube.animate {
+  transition: all 0.5s ease-out;
+}
+
+.cube div {
+  --offset: calc(var(--size) / 2);
+  position: absolute;
+  width: var(--size);
+  height: var(--size);
+  background: white;
+  box-sizing: border-box;
+  border: 1px black solid;
+}
+
+.cube div:nth-child(1) {
+  transform: translateZ(var(--offset));
+}
+
+.cube div:nth-child(2) {
+  transform: rotateY(-90deg) translateZ(var(--offset));
+}
+
+.cube div:nth-child(3) {
+  transform: rotateY(90deg) translateZ(var(--offset));
+}
+
+.cube div:nth-child(4) {
+  transform: rotateX(90deg) translateZ(var(--offset));
+}
+
+.cube div:nth-child(5) {
+  transform: rotateX(-90deg) translateZ(var(--offset));
+}
