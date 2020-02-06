@@ -47,7 +47,7 @@ body {
   transition: all 0.5s ease-out;
 }
 
-.cube div {
+.cube > div {
   --offset: calc(var(--size) / 2);
   position: absolute;
   width: var(--size);
@@ -57,22 +57,22 @@ body {
   border: 1px black solid;
 }
 
-.cube div:nth-child(1) {
+.cube > div:nth-child(1) {
   transform: translateZ(var(--offset));
 }
 
-.cube div:nth-child(2) {
+.cube > div:nth-child(2) {
   transform: rotateY(-90deg) translateZ(var(--offset));
 }
 
-.cube div:nth-child(3) {
+.cube > div:nth-child(3) {
   transform: rotateY(90deg) translateZ(var(--offset));
 }
 
-.cube div:nth-child(4) {
+.cube > div:nth-child(4) {
   transform: rotateX(90deg) translateZ(var(--offset));
 }
 
-.cube div:nth-child(5) {
+.cube > div:nth-child(5) {
   transform: rotateX(-90deg) translateZ(var(--offset));
 }

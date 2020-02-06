@@ -4812,8 +4812,94 @@
   unwrapExports(renderNode_1);
   var renderNode_2 = renderNode_1.renderNode;
 
+  /*! *****************************************************************************
+  Copyright (c) Microsoft Corporation. All rights reserved.
+  Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+  this file except in compliance with the License. You may obtain a copy of the
+  License at http://www.apache.org/licenses/LICENSE-2.0
+
+  THIS CODE IS PROVIDED ON AN *AS IS* BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION ANY IMPLIED
+  WARRANTIES OR CONDITIONS OF TITLE, FITNESS FOR A PARTICULAR PURPOSE,
+  MERCHANTABLITY OR NON-INFRINGEMENT.
+
+  See the Apache Version 2.0 License for specific language governing permissions
+  and limitations under the License.
+  ***************************************************************************** */
+
+  var __assign$1 = function() {
+      __assign$1 = Object.assign || function __assign(t) {
+          for (var s, i = 1, n = arguments.length; i < n; i++) {
+              s = arguments[i];
+              for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p)) t[p] = s[p];
+          }
+          return t;
+      };
+      return __assign$1.apply(this, arguments);
+  };
+
+  /**
+   * Source: ftp://ftp.unicode.org/Public/UCD/latest/ucd/SpecialCasing.txt
+   */
+  /**
+   * Lower case as a function.
+   */
+  function lowerCase(str) {
+      return str.toLowerCase();
+  }
+
+  // Support camel case ("camelCase" -> "camel Case" and "CAMELCase" -> "CAMEL Case").
+  var DEFAULT_SPLIT_REGEXP = [/([a-z0-9])([A-Z])/g, /([A-Z])([A-Z][a-z])/g];
+  // Remove all non-word characters.
+  var DEFAULT_STRIP_REGEXP = /[^A-Z0-9]+/gi;
+  /**
+   * Normalize the string into something other libraries can manipulate easier.
+   */
+  function noCase(input, options) {
+      if (options === void 0) { options = {}; }
+      var _a = options.splitRegexp, splitRegexp = _a === void 0 ? DEFAULT_SPLIT_REGEXP : _a, _b = options.stripRegexp, stripRegexp = _b === void 0 ? DEFAULT_STRIP_REGEXP : _b, _c = options.transform, transform = _c === void 0 ? lowerCase : _c, _d = options.delimiter, delimiter = _d === void 0 ? " " : _d;
+      var result = replace(replace(input, splitRegexp, "$1\0$2"), stripRegexp, "\0");
+      var start = 0;
+      var end = result.length;
+      // Trim the delimiter from around the output string.
+      while (result.charAt(start) === "\0")
+          start++;
+      while (result.charAt(end - 1) === "\0")
+          end--;
+      // Transform each token independently.
+      return result
+          .slice(start, end)
+          .split("\0")
+          .map(transform)
+          .join(delimiter);
+  }
+  /**
+   * Replace `re` in the input string with the replacement value.
+   */
+  function replace(input, re, value) {
+      if (re instanceof RegExp)
+          return input.replace(re, value);
+      return re.reduce(function (input, re) { return input.replace(re, value); }, input);
+  }
+
+  function dotCase(input, options) {
+      if (options === void 0) { options = {}; }
+      return noCase(input, __assign$1({ delimiter: "." }, options));
+  }
+
+  function paramCase(input, options) {
+      if (options === void 0) { options = {}; }
+      return dotCase(input, __assign$1({ delimiter: "-" }, options));
+  }
+
+  var dist_es2015 = /*#__PURE__*/Object.freeze({
+    __proto__: null,
+    paramCase: paramCase
+  });
+
   var renderStyles = createCommonjsModule(function (module, exports) {
   Object.defineProperty(exports, "__esModule", { value: true });
+
   function renderStyle(styles) {
       const renderedStyles = Object.keys(styles).reduce((res, className) => {
           const allSelectors = Object.keys(styles[className]).reduce((res, key) => {
@@ -4828,7 +4914,9 @@
               return res;
           }, {});
           const renderStyleObject = (className, styleObj) => {
-              return `.${className}{${Object.keys(styleObj).map((k) => `${k}: ${styleObj[k]};`).join('')}}`;
+              const properties = Object.keys(styleObj)
+                  .map((k) => `${dist_es2015.paramCase(k)}: ${styleObj[k]};`);
+              return `.${className}{${properties.join('')}}`;
           };
           // Render all styles for the current className (including pseudo selectors)
           Object.keys(allSelectors).forEach((selector) => {
@@ -5088,17 +5176,46 @@
   var brynja_3 = brynja.extend;
   var brynja_4 = brynja.render;
 
+  let roomService;
+  const setupGeneralControls = (ctx) => {
+      roomService = ctx.roomService;
+  };
+  const sendDirection = (direction) => {
+      roomService.send(direction);
+  };
+
+  const arrowButtonRight = (onClick) => (_) => _
+      .child('div', _ => _
+      .on('click', onClick)
+      .on('click', () => {
+      sendDirection('RIGHT');
+  })
+      .style({
+      position: 'absolute',
+      right: '10px',
+      top: 'calc(50% - 50px)',
+      width: '0',
+      height: '0',
+      borderTop: '60px solid transparent',
+      borderBottom: '60px solid transparent',
+      borderLeft: '60px solid orangered',
+  }));
+
   const buildHome = (_) => _
       .child('h1', _ => _
       .class(['heading'])
-      .text('Living Room'));
+      .text('Living Room'))
+      .do(arrowButtonRight(() => {
+      console.log('Right Clicked');
+  }));
 
   const rooms = {
       'home': buildHome
   };
-  brynja_3('setContent', (contentKey) => _ => {
+  const setContent = (contentKey) => (_) => {
       if (contentKey in rooms) {
-          return rooms[contentKey](_);
+          const roomName = contentKey;
+          return rooms[roomName](_);
       }
       else {
           // Default fallback builder
@@ -5107,7 +5224,7 @@
               .class(['heading'])
               .text(contentKey));
       }
-  });
+  };
   const updateCube = (state, onTransitioned = () => { }) => {
       brynja_4(_ => _
           .prop('style', `
@@ -5122,19 +5239,19 @@
           .on('transitionend', onTransitioned)
           .child('div', _ => _
           .id('front')
-          .setContent(state.content.FRONT))
+          .do(setContent(state.content.FRONT)))
           .child('div', _ => _
           .id('left')
-          .setContent(state.content.LEFT))
+          .do(setContent(state.content.LEFT)))
           .child('div', _ => _
           .id('right')
-          .setContent(state.content.RIGHT))
+          .do(setContent(state.content.RIGHT)))
           .child('div', _ => _
           .id('top')
-          .setContent(state.content.UP))
+          .do(setContent(state.content.UP)))
           .child('div', _ => _
           .id('bottom')
-          .setContent(state.content.DOWN))));
+          .do(setContent(state.content.DOWN)))));
   };
 
   // Stateless machine definition
@@ -5325,16 +5442,16 @@
           }
           const key = ev.code;
           if (key === "ArrowUp") {
-              ctx.roomService.send("UP");
+              sendDirection("UP");
           }
           else if (key === "ArrowDown") {
-              ctx.roomService.send("DOWN");
+              sendDirection("DOWN");
           }
           else if (key === "ArrowLeft") {
-              ctx.roomService.send("LEFT");
+              sendDirection("LEFT");
           }
           else if (key === "ArrowRight") {
-              ctx.roomService.send("RIGHT");
+              sendDirection("RIGHT");
           }
       });
   };
@@ -7997,7 +8114,7 @@
           if (ctx.swallowInput) {
               return;
           }
-          ctx.roomService.send('DOWN');
+          sendDirection('DOWN');
       });
       hammer$1.on("swipedown", (ev) => {
           if (ev.pointerType !== 'touch') {
@@ -8006,7 +8123,7 @@
           if (ctx.swallowInput) {
               return;
           }
-          ctx.roomService.send('UP');
+          sendDirection('UP');
       });
       hammer$1.on("swipeleft", (ev) => {
           if (ev.pointerType !== 'touch') {
@@ -8015,7 +8132,7 @@
           if (ctx.swallowInput) {
               return;
           }
-          ctx.roomService.send('RIGHT');
+          sendDirection('RIGHT');
       });
       hammer$1.on("swiperight", (ev) => {
           if (ev.pointerType !== 'touch') {
@@ -8024,7 +8141,7 @@
           if (ctx.swallowInput) {
               return;
           }
-          ctx.roomService.send('LEFT');
+          sendDirection('LEFT');
       });
   };
 
@@ -8054,6 +8171,7 @@
       })
           .start(),
   };
+  setupGeneralControls(ctx);
   setupSwipeControls(ctx);
   setupKeyboardControls(ctx);
 

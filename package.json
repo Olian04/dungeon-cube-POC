@@ -4,7 +4,8 @@
   "description": "Just a proof of concept",
   "main": "index.html",
   "scripts": {
-    "build": "rollup --config"
+    "build": "rollup --config",
+    "watch": "rollup --config --watch"
   },
   "repository": {
     "type": "git",
@@ -21,7 +22,7 @@
     "@types/rollup-plugin-commonjs": "^9.3.1",
     "@types/rollup-plugin-node-resolve": "^4.1.0",
     "@types/typescript": "^2.0.0",
-    "brynja": "^3.1.0",
+    "brynja": "^3.2.0",
     "easy-css-variables": "^1.0.0",
     "hammerjs": "^2.0.8",
     "rollup": "^1.29.0",
