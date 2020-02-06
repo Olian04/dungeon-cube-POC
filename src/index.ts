@@ -1,10 +1,12 @@
 import { interpret } from 'xstate/es';
-import Hammer from 'hammerjs';
 import { roomMachine } from './stateMachine';
+import { setupKeyboardControls } from './controls/keyboardControls';
+import { setupSwipeControls } from './controls/swipeControls';
+import { setupGeneralControls } from './controls/generalControls';
 
-let swallowInput = false;
-
-const roomService = interpret(roomMachine
+const ctx = {
+  swallowInput: false,
+  roomService: interpret(roomMachine
   .withContext({
     doAnimation: true,
     content: {
@@ -19,54 +21,19 @@ const roomService = interpret(roomMachine
       y: 0,
     },
     resetInputStop: () => {
-      swallowInput = false;
+      ctx.swallowInput = false;
     },
   })
 ).onTransition(state => {
     if (state.changed) {
-      swallowInput = true;
+      ctx.swallowInput = true;
     }
   })
-  .start();
+  .start(),
+};
 
-const hammer = new Hammer(document.body);
+export type RoomService = typeof ctx.roomService;
 
-hammer.get('swipe').set({
-    direction: Hammer.DIRECTION_ALL
-});
-
-// listen to events...
-hammer.on("swipeup", (ev) => {
-  if (ev.pointerType !== 'touch') { return; }
-  if (swallowInput) { return; }
-  roomService.send('DOWN');
-});
-hammer.on("swipedown", (ev) => {
-  if (ev.pointerType !== 'touch') { return; }
-  if (swallowInput) { return; }
-  roomService.send('UP');
-});
-hammer.on("swipeleft", (ev) => {
-  if (ev.pointerType !== 'touch') { return; }
-  if (swallowInput) { return; }
-  roomService.send('RIGHT');
-});
-hammer.on("swiperight", (ev) => {
-  if (ev.pointerType !== 'touch') { return; }
-  if (swallowInput) { return; }
-  roomService.send('LEFT');
-});
-
-document.addEventListener("keydown", ev => {
-  if (swallowInput) { return; }
-  const key = ev.code;
-  if (key === "ArrowUp") {
-    roomService.send("UP");
-  } else if (key === "ArrowDown") {
-    roomService.send("DOWN");
-  } else if (key === "ArrowLeft") {
-    roomService.send("LEFT");
-  } else if (key === "ArrowRight") {
-    roomService.send("RIGHT");
-  }
-});
+setupGeneralControls(ctx);
+setupSwipeControls(ctx);
+setupKeyboardControls(ctx);

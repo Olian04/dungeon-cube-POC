@@ -4421,6 +4421,924 @@
   	return module = { exports: {} }, fn(module, module.exports), module.exports;
   }
 
+  var crypt = createCommonjsModule(function (module) {
+  (function() {
+    var base64map
+        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
+
+    crypt = {
+      // Bit-wise rotation left
+      rotl: function(n, b) {
+        return (n << b) | (n >>> (32 - b));
+      },
+
+      // Bit-wise rotation right
+      rotr: function(n, b) {
+        return (n << (32 - b)) | (n >>> b);
+      },
+
+      // Swap big-endian to little-endian and vice versa
+      endian: function(n) {
+        // If number given, swap endian
+        if (n.constructor == Number) {
+          return crypt.rotl(n, 8) & 0x00FF00FF | crypt.rotl(n, 24) & 0xFF00FF00;
+        }
+
+        // Else, assume array and swap all items
+        for (var i = 0; i < n.length; i++)
+          n[i] = crypt.endian(n[i]);
+        return n;
+      },
+
+      // Generate an array of any length of random bytes
+      randomBytes: function(n) {
+        for (var bytes = []; n > 0; n--)
+          bytes.push(Math.floor(Math.random() * 256));
+        return bytes;
+      },
+
+      // Convert a byte array to big-endian 32-bit words
+      bytesToWords: function(bytes) {
+        for (var words = [], i = 0, b = 0; i < bytes.length; i++, b += 8)
+          words[b >>> 5] |= bytes[i] << (24 - b % 32);
+        return words;
+      },
+
+      // Convert big-endian 32-bit words to a byte array
+      wordsToBytes: function(words) {
+        for (var bytes = [], b = 0; b < words.length * 32; b += 8)
+          bytes.push((words[b >>> 5] >>> (24 - b % 32)) & 0xFF);
+        return bytes;
+      },
+
+      // Convert a byte array to a hex string
+      bytesToHex: function(bytes) {
+        for (var hex = [], i = 0; i < bytes.length; i++) {
+          hex.push((bytes[i] >>> 4).toString(16));
+          hex.push((bytes[i] & 0xF).toString(16));
+        }
+        return hex.join('');
+      },
+
+      // Convert a hex string to a byte array
+      hexToBytes: function(hex) {
+        for (var bytes = [], c = 0; c < hex.length; c += 2)
+          bytes.push(parseInt(hex.substr(c, 2), 16));
+        return bytes;
+      },
+
+      // Convert a byte array to a base-64 string
+      bytesToBase64: function(bytes) {
+        for (var base64 = [], i = 0; i < bytes.length; i += 3) {
+          var triplet = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
+          for (var j = 0; j < 4; j++)
+            if (i * 8 + j * 6 <= bytes.length * 8)
+              base64.push(base64map.charAt((triplet >>> 6 * (3 - j)) & 0x3F));
+            else
+              base64.push('=');
+        }
+        return base64.join('');
+      },
+
+      // Convert a base-64 string to a byte array
+      base64ToBytes: function(base64) {
+        // Remove non-base-64 characters
+        base64 = base64.replace(/[^A-Z0-9+\/]/ig, '');
+
+        for (var bytes = [], i = 0, imod4 = 0; i < base64.length;
+            imod4 = ++i % 4) {
+          if (imod4 == 0) continue;
+          bytes.push(((base64map.indexOf(base64.charAt(i - 1))
+              & (Math.pow(2, -2 * imod4 + 8) - 1)) << (imod4 * 2))
+              | (base64map.indexOf(base64.charAt(i)) >>> (6 - imod4 * 2)));
+        }
+        return bytes;
+      }
+    };
+
+    module.exports = crypt;
+  })();
+  });
+
+  var charenc = {
+    // UTF-8 encoding
+    utf8: {
+      // Convert a string to a byte array
+      stringToBytes: function(str) {
+        return charenc.bin.stringToBytes(unescape(encodeURIComponent(str)));
+      },
+
+      // Convert a byte array to a string
+      bytesToString: function(bytes) {
+        return decodeURIComponent(escape(charenc.bin.bytesToString(bytes)));
+      }
+    },
+
+    // Binary encoding
+    bin: {
+      // Convert a string to a byte array
+      stringToBytes: function(str) {
+        for (var bytes = [], i = 0; i < str.length; i++)
+          bytes.push(str.charCodeAt(i) & 0xFF);
+        return bytes;
+      },
+
+      // Convert a byte array to a string
+      bytesToString: function(bytes) {
+        for (var str = [], i = 0; i < bytes.length; i++)
+          str.push(String.fromCharCode(bytes[i]));
+        return str.join('');
+      }
+    }
+  };
+
+  var charenc_1 = charenc;
+
+  var sha1 = createCommonjsModule(function (module) {
+  (function() {
+    var crypt$1 = crypt,
+        utf8 = charenc_1.utf8,
+        bin = charenc_1.bin,
+
+    // The core
+    sha1 = function (message) {
+      // Convert to byte array
+      if (message.constructor == String)
+        message = utf8.stringToBytes(message);
+      else if (typeof Buffer !== 'undefined' && typeof Buffer.isBuffer == 'function' && Buffer.isBuffer(message))
+        message = Array.prototype.slice.call(message, 0);
+      else if (!Array.isArray(message))
+        message = message.toString();
+
+      // otherwise assume byte array
+
+      var m  = crypt$1.bytesToWords(message),
+          l  = message.length * 8,
+          w  = [],
+          H0 =  1732584193,
+          H1 = -271733879,
+          H2 = -1732584194,
+          H3 =  271733878,
+          H4 = -1009589776;
+
+      // Padding
+      m[l >> 5] |= 0x80 << (24 - l % 32);
+      m[((l + 64 >>> 9) << 4) + 15] = l;
+
+      for (var i = 0; i < m.length; i += 16) {
+        var a = H0,
+            b = H1,
+            c = H2,
+            d = H3,
+            e = H4;
+
+        for (var j = 0; j < 80; j++) {
+
+          if (j < 16)
+            w[j] = m[i + j];
+          else {
+            var n = w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16];
+            w[j] = (n << 1) | (n >>> 31);
+          }
+
+          var t = ((H0 << 5) | (H0 >>> 27)) + H4 + (w[j] >>> 0) + (
+                  j < 20 ? (H1 & H2 | ~H1 & H3) + 1518500249 :
+                  j < 40 ? (H1 ^ H2 ^ H3) + 1859775393 :
+                  j < 60 ? (H1 & H2 | H1 & H3 | H2 & H3) - 1894007588 :
+                           (H1 ^ H2 ^ H3) - 899497514);
+
+          H4 = H3;
+          H3 = H2;
+          H2 = (H1 << 30) | (H1 >>> 2);
+          H1 = H0;
+          H0 = t;
+        }
+
+        H0 += a;
+        H1 += b;
+        H2 += c;
+        H3 += d;
+        H4 += e;
+      }
+
+      return [H0, H1, H2, H3, H4];
+    },
+
+    // Public API
+    api = function (message, options) {
+      var digestbytes = crypt$1.wordsToBytes(sha1(message));
+      return options && options.asBytes ? digestbytes :
+          options && options.asString ? bin.bytesToString(digestbytes) :
+          crypt$1.bytesToHex(digestbytes);
+    };
+
+    api._blocksize = 16;
+    api._digestsize = 20;
+
+    module.exports = api;
+  })();
+  });
+
+  var hash = createCommonjsModule(function (module, exports) {
+  var __importDefault = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
+      return (mod && mod.__esModule) ? mod : { "default": mod };
+  };
+  Object.defineProperty(exports, "__esModule", { value: true });
+  const sha1_1 = __importDefault(sha1);
+  // This is used to ensure that no hash begins with a number, since CSS selectors cant start with numbers
+  const prefix = 'brynja-';
+  exports.objHash = (obj) => prefix + sha1_1.default(JSON.stringify(obj));
+  });
+
+  unwrapExports(hash);
+  var hash_1 = hash.objHash;
+
+  var builder = createCommonjsModule(function (module, exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+
+  exports.newVNode = (ctx = {}) => (Object.assign({ tag: '', value: null, text: '', events: {}, props: {}, children: [] }, ctx));
+  function buildNode(tagType, builder, customOperations) {
+      const ctx = exports.newVNode({
+          tag: tagType,
+      });
+      let styles = {};
+      const builderCtx = Object.assign({ style(styleObject) {
+              const styleHash = hash.objHash(styleObject);
+              styles[styleHash] = styleObject;
+              this.class([styleHash]);
+              return this;
+          },
+          on(eventName, handler) {
+              if (eventName in ctx.events) {
+                  ctx.events[eventName].push(handler);
+              }
+              else {
+                  ctx.events[eventName] = [handler];
+              }
+              return this;
+          },
+          child(tagType, builder) {
+              const [child, childStyles] = buildNode(tagType, builder, customOperations);
+              ctx.children.push(child);
+              styles = Object.assign(Object.assign({}, styles), childStyles);
+              return this;
+          },
+          children(tagType, count, builder) {
+              for (let __i = 0; __i < count; __i++) {
+                  const [child, childStyles] = buildNode(tagType, (_) => builder(_, __i), customOperations);
+                  ctx.children.push(child);
+                  styles = Object.assign(Object.assign({}, styles), childStyles);
+              }
+              return this;
+          },
+          when(booleanExpression, then_builder, else_builder) {
+              if (booleanExpression) {
+                  then_builder(this);
+              }
+              else if (else_builder) {
+                  else_builder(this);
+              }
+              return this;
+          },
+          while(predicate, builder) {
+              for (let i = 0; predicate(i); i++) {
+                  builder(this, i);
+              }
+              return this;
+          },
+          do(...builders) {
+              builders.forEach((builder) => builder(this));
+              return this;
+          },
+          value(value) {
+              ctx.value = value;
+              return this;
+          },
+          text(value) {
+              ctx.text = value;
+              return this;
+          },
+          prop(key, value) {
+              ctx.props[key] = value;
+              return this;
+          },
+          id(value) {
+              ctx.props.id = value;
+              return this;
+          },
+          class(valuesArr) {
+              if (!('class' in ctx.props)) {
+                  ctx.props.class = valuesArr.join(' ');
+              }
+              else {
+                  ctx.props.class = [...ctx.props.class.split(' '), ...valuesArr].join(' ');
+              }
+              return this;
+          },
+          name(value) {
+              ctx.props.name = value;
+              return this;
+          },
+          peek(callback) {
+              function ctxProxy(ctx) {
+                  return {
+                      tag: ctx.tag,
+                      text: ctx.text,
+                      value: ctx.value,
+                      props: ctx.props,
+                      events: ctx.events,
+                      children: new Proxy([], {
+                          get: (arr, key) => {
+                              if (key === 'length') {
+                                  return ctx.children.length;
+                              }
+                              else if (!isNaN(parseFloat(key.toString()))) {
+                                  return ctxProxy(ctx.children[key]);
+                              }
+                              else {
+                                  return arr[key];
+                              }
+                          },
+                      }),
+                  };
+              }
+              callback(ctxProxy(ctx));
+              return this;
+          } }, Object.keys(customOperations).reduce((res, k) => (Object.assign(Object.assign({}, res), { [k]: (...args) => {
+              customOperations[k](...args)(builderCtx);
+              return builderCtx;
+          } })), {}));
+      builder(builderCtx);
+      return [ctx, styles];
+  }
+  exports.buildNode = buildNode;
+  });
+
+  unwrapExports(builder);
+  var builder_1 = builder.newVNode;
+  var builder_2 = builder.buildNode;
+
+  var renderNode_1 = createCommonjsModule(function (module, exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  function renderNode(node) {
+      const elem = document.createElement(node.tag);
+      if (node.value) {
+          // @ts-ignore
+          elem.value = node.value;
+          elem.setAttribute('value', '' + node.value);
+      }
+      if (node.text !== '') {
+          const $text = document.createTextNode(node.text);
+          elem.appendChild($text);
+      }
+      Object.keys(node.props).forEach((prop) => {
+          elem.setAttribute(prop, node.props[prop]);
+      });
+      Object.keys(node.events).forEach((event) => {
+          elem.addEventListener(event, (e) => {
+              node.events[event].forEach((cb) => {
+                  cb(e);
+              });
+          });
+      });
+      node.children.forEach((node) => {
+          elem.appendChild(renderNode(node));
+      });
+      return elem;
+  }
+  exports.renderNode = renderNode;
+  });
+
+  unwrapExports(renderNode_1);
+  var renderNode_2 = renderNode_1.renderNode;
+
+  var renderStyles = createCommonjsModule(function (module, exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+  function renderStyle(styles) {
+      const renderedStyles = Object.keys(styles).reduce((res, className) => {
+          const allSelectors = Object.keys(styles[className]).reduce((res, key) => {
+              if (key.startsWith(':')) {
+                  // Extract pseudoClasses
+                  res[className + key] = styles[className][key];
+              }
+              else {
+                  // Pass the property along
+                  res[className] = Object.assign(Object.assign({}, res[className]), { [key]: styles[className][key] });
+              }
+              return res;
+          }, {});
+          const renderStyleObject = (className, styleObj) => {
+              return `.${className}{${Object.keys(styleObj).map((k) => `${k}: ${styleObj[k]};`).join('')}}`;
+          };
+          // Render all styles for the current className (including pseudo selectors)
+          Object.keys(allSelectors).forEach((selector) => {
+              res += renderStyleObject(selector, allSelectors[selector]);
+          });
+          return res;
+      }, '');
+      return renderedStyles;
+  }
+  exports.renderStyle = renderStyle;
+  });
+
+  unwrapExports(renderStyles);
+  var renderStyles_1 = renderStyles.renderStyle;
+
+  var updateNode_1 = createCommonjsModule(function (module, exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+
+  const TEXT_NODE = 3; // https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
+  function updateNode(newNode, oldNode, elem) {
+      if (newNode.tag.toLowerCase() !== oldNode.tag.toLowerCase()) {
+          // Different tags requires a re-render
+          const newElem = renderNode_1.renderNode(newNode);
+          elem.parentNode.replaceChild(newElem, elem);
+      }
+      // #region Update value
+      if (newNode.value && newNode.value !== oldNode.value) {
+          // @ts-ignore
+          elem.value = newNode.value;
+          elem.setAttribute('value', '' + newNode.value);
+      }
+      else if (newNode.value !== oldNode.value) {
+          // @ts-ignore
+          elem.value = undefined;
+          elem.removeAttribute('value');
+      }
+      // #endregion
+      // #region Update text node
+      if (oldNode.text === newNode.text) ;
+      else if (oldNode.text === '' && newNode.text !== '') {
+          // Add text
+          const $text = document.createTextNode(newNode.text);
+          elem.appendChild($text);
+      }
+      else if (oldNode.text !== '') {
+          if (elem.firstChild.nodeType !== TEXT_NODE) {
+              // This should never happen. So no need to test for it?
+              /* istanbul ignore next */
+              throw new Error('Unexpected "none text node" as first child of element: ' + elem);
+          }
+          if (newNode.text === '') {
+              // Remove text
+              elem.firstChild.remove();
+          }
+          else if (newNode.text !== '') {
+              // Update text
+              elem.firstChild.textContent = newNode.text;
+          }
+      }
+      // #endregion
+      // #region Update props
+      new Set([
+          ...Object.keys(oldNode.props),
+          ...Object.keys(newNode.props),
+      ]).forEach((prop) => {
+          if (prop in oldNode.props && !(prop in newNode.props)) {
+              // Remove prop
+              elem.removeAttribute(prop);
+          }
+          else if (prop in newNode.props && !(prop in oldNode.props)) {
+              // Add prop
+              elem.setAttribute(prop, newNode.props[prop]);
+          }
+          else if (prop in newNode.props && prop in oldNode.props && newNode.props[prop] !== oldNode.props[prop]) {
+              // Update prop
+              elem.setAttribute(prop, newNode.props[prop]);
+          }
+      });
+      // #endregion
+      // #region Update events
+      new Set([
+          ...Object.keys(oldNode.events),
+          ...Object.keys(newNode.events),
+      ]).forEach((event) => {
+          if (event in oldNode.events && !(event in newNode.events)) {
+              // Remove all listeners
+              oldNode.events[event].forEach((cb) => {
+                  elem.removeEventListener(event, cb);
+              });
+          }
+          else if (event in newNode.events && !(event in oldNode.events)) {
+              // Add new listeners
+              newNode.events[event].forEach((cb) => {
+                  elem.addEventListener(event, cb);
+              });
+          }
+          else if (event in newNode.events && event in oldNode.events) {
+              // Some listeners might have changed
+              for (let i = 0; i < Math.max(oldNode.events[event].length, newNode.events[event].length); i++) {
+                  const oldHandler = oldNode.events[event][i];
+                  const newHandler = newNode.events[event][i];
+                  // Naively compare function signatures between oldNode and newNode to limit nr of assignments each render
+                  if (oldHandler.toString() !== newHandler.toString()) {
+                      elem.removeEventListener(event, oldHandler);
+                      elem.addEventListener(event, newHandler);
+                  }
+              }
+          }
+      });
+      // #endregion
+      // #region Update children
+      for (let i = 0; i < newNode.children.length; i++) {
+          if (i < oldNode.children.length) {
+              // Updated elements compared to previous nodeTree
+              updateNode(newNode.children[i], oldNode.children[i], elem.children.item(i));
+          }
+          else {
+              // Create new elements
+              elem.appendChild(renderNode_1.renderNode(newNode.children[i]));
+          }
+      }
+      const firstInvalidIndex = newNode.children.length;
+      const elementsToRemove = elem.children.length - firstInvalidIndex;
+      for (let i = 0; i < elementsToRemove; i++) {
+          // Remove extra elements
+          elem.children.item(firstInvalidIndex).remove();
+      }
+      // #endregion
+  }
+  exports.updateNode = updateNode;
+  });
+
+  unwrapExports(updateNode_1);
+  var updateNode_2 = updateNode_1.updateNode;
+
+  var renderer = createCommonjsModule(function (module, exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+
+
+
+
+  function Renderer(config) {
+      let initialRender = true;
+      let oldRootNode = null;
+      const customOperations = {};
+      return {
+          render(rootBuilder) {
+              const [rootNode, styles] = builder.buildNode(config.rootElement.tagName.toLowerCase(), rootBuilder, customOperations);
+              // Append styles if needed
+              if (Object.keys(styles).length > 0) {
+                  rootNode.children.push(builder.newVNode({
+                      tag: 'style',
+                      text: renderStyles.renderStyle(styles),
+                      props: {
+                          type: 'text/css',
+                      },
+                  }));
+              }
+              // Render / Update HTML
+              if (initialRender) {
+                  initialRender = false;
+                  const newRoot = renderNode_1.renderNode(rootNode);
+                  config.rootElement.replaceWith(newRoot);
+                  config.rootElement = newRoot;
+              }
+              else {
+                  updateNode_1.updateNode(rootNode, oldRootNode, config.rootElement);
+              }
+              // Update refs for next render
+              oldRootNode = rootNode;
+          },
+          extend(operationName, constructor) {
+              customOperations[operationName] = constructor;
+          },
+      };
+  }
+  exports.Renderer = Renderer;
+  });
+
+  unwrapExports(renderer);
+  var renderer_1 = renderer.Renderer;
+
+  var events = createCommonjsModule(function (module, exports) {
+  // Events: https://www.w3schools.com/tags/ref_eventattributes.asp
+  Object.defineProperty(exports, "__esModule", { value: true });
+  // tslint:disable-next-line no-namespace
+  var Events;
+  (function (Events) {
+      let Mouse;
+      (function (Mouse) {
+          Mouse["Click"] = "click";
+          Mouse["DoubleClick"] = "dblclick";
+          Mouse["Down"] = "mousedown";
+          Mouse["Up"] = "mouseup";
+          Mouse["Move"] = "mousemove";
+          Mouse["Out"] = "mouseout";
+          Mouse["Over"] = "mouseover";
+          Mouse["Wheel"] = "wheel";
+      })(Mouse = Events.Mouse || (Events.Mouse = {}));
+      let Keyboard;
+      (function (Keyboard) {
+          Keyboard["Down"] = "keydown";
+          Keyboard["Up"] = "keyup";
+          Keyboard["Press"] = "keypress";
+      })(Keyboard = Events.Keyboard || (Events.Keyboard = {}));
+      let Drag;
+      (function (Drag) {
+          Drag["Drag"] = "drag";
+          Drag["End"] = "dragend";
+          Drag["Enter"] = "dragenter";
+          Drag["Leave"] = "dragleave";
+          Drag["Over"] = "dragover";
+          Drag["Start"] = "dragstart";
+          Drag["Drop"] = "drop";
+          Drag["Scroll"] = "scroll";
+      })(Drag = Events.Drag || (Events.Drag = {}));
+      let Clipboard;
+      (function (Clipboard) {
+          Clipboard["Copy"] = "copy";
+          Clipboard["Cut"] = "cut";
+          Clipboard["Paste"] = "paste";
+      })(Clipboard = Events.Clipboard || (Events.Clipboard = {}));
+  })(Events = exports.Events || (exports.Events = {}));
+  });
+
+  unwrapExports(events);
+  var events_1 = events.Events;
+
+  var brynja = createCommonjsModule(function (module, exports) {
+  Object.defineProperty(exports, "__esModule", { value: true });
+
+
+  exports.Events = events.Events;
+  var renderer_2 = renderer;
+  exports.Renderer = renderer_2.Renderer;
+  const defaultRenderer = (() => {
+      let default_renderer = null;
+      return () => {
+          if (default_renderer === null) {
+              // This makes sure the dom is ready when the Renderer is constructed.
+              default_renderer = renderer.Renderer({
+                  rootElement: document.getElementById('root'),
+              });
+          }
+          return default_renderer;
+      };
+  })();
+  // Because the tests run asynchronous its typically unreliable to test the extend functionality of the default renderer.
+  /* istanbul ignore next */
+  exports.extend = (operationName, constructor) => defaultRenderer().extend(operationName, constructor);
+  exports.render = (rootBuilder) => defaultRenderer().render(rootBuilder);
+  });
+
+  unwrapExports(brynja);
+  var brynja_1 = brynja.Events;
+  var brynja_2 = brynja.Renderer;
+  var brynja_3 = brynja.extend;
+  var brynja_4 = brynja.render;
+
+  const buildHome = (_) => _
+      .child('h1', _ => _
+      .class(['heading'])
+      .text('Living Room'));
+
+  const rooms = {
+      'home': buildHome
+  };
+  brynja_3('setContent', (contentKey) => _ => {
+      if (contentKey in rooms) {
+          return rooms[contentKey](_);
+      }
+      else {
+          // Default fallback builder
+          return _
+              .child('h1', _ => _
+              .class(['heading'])
+              .text(contentKey));
+      }
+  });
+  const updateCube = (state, onTransitioned = () => { }) => {
+      brynja_4(_ => _
+          .prop('style', `
+      --rotationX: ${state.rotate.x}deg;
+      --rotationY: ${state.rotate.y}deg;
+    `)
+          .id('wrapper')
+          .child('div', _ => _
+          .class(['cube'])
+          .when(state.doAnimation, _ => _
+          .class(['animate']))
+          .on('transitionend', onTransitioned)
+          .child('div', _ => _
+          .id('front')
+          .setContent(state.content.FRONT))
+          .child('div', _ => _
+          .id('left')
+          .setContent(state.content.LEFT))
+          .child('div', _ => _
+          .id('right')
+          .setContent(state.content.RIGHT))
+          .child('div', _ => _
+          .id('top')
+          .setContent(state.content.UP))
+          .child('div', _ => _
+          .id('bottom')
+          .setContent(state.content.DOWN))));
+  };
+
+  // Stateless machine definition
+  const roomMachine = Machine({
+      id: "rooms",
+      initial: "home",
+      context: {
+          doAnimation: true,
+          content: {
+              FRONT: 'home',
+              LEFT: '',
+              RIGHT: '',
+              UP: '',
+              DOWN: '',
+          },
+          rotate: {
+              x: 0,
+              y: 0,
+          },
+          resetInputStop: () => { },
+      },
+      states: {
+          home: {
+              entry: ["loadRoom"],
+              on: {
+                  UP: {
+                      target: "attic",
+                      actions: ["transitionUp"]
+                  },
+                  LEFT: {
+                      target: "porch",
+                      actions: ["transitionLeft"]
+                  },
+                  RIGHT: {
+                      target: "yard",
+                      actions: ["transitionRight"]
+                  },
+                  DOWN: {
+                      target: "basement",
+                      actions: ["transitionDown"]
+                  }
+              }
+          },
+          basement: {
+              entry: ["loadRoom"],
+              on: {
+                  UP: {
+                      target: "home",
+                      actions: ["transitionUp"]
+                  },
+                  DOWN: {
+                      target: "secret laboratory",
+                      actions: ["transitionDown"]
+                  }
+              }
+          },
+          "secret laboratory": {
+              entry: ["loadRoom"],
+              on: {
+                  UP: {
+                      target: "basement",
+                      actions: ["transitionUp"]
+                  },
+                  LEFT: {
+                      target: "room of vials",
+                      actions: ["transitionLeft"]
+                  },
+                  RIGHT: {
+                      target: "prison cells",
+                      actions: ["transitionRight"]
+                  }
+              }
+          },
+          "room of vials": {
+              entry: ["loadRoom"],
+              on: {
+                  RIGHT: {
+                      target: "secret laboratory",
+                      actions: ["transitionRight"]
+                  }
+              }
+          },
+          "prison cells": {
+              entry: ["loadRoom"],
+              on: {
+                  LEFT: {
+                      target: "secret laboratory",
+                      actions: ["transitionLeft"]
+                  }
+              }
+          },
+          porch: {
+              entry: ["loadRoom"],
+              on: {
+                  RIGHT: {
+                      target: "home",
+                      actions: ["transitionRight"]
+                  },
+                  LEFT: {
+                      target: "yard",
+                      actions: ["transitionLeft"]
+                  }
+              }
+          },
+          yard: {
+              entry: ["loadRoom"],
+              on: {
+                  LEFT: {
+                      target: "home",
+                      actions: ["transitionLeft"]
+                  },
+                  RIGHT: {
+                      target: "porch",
+                      actions: ["transitionRight"]
+                  }
+              }
+          },
+          attic: {
+              entry: ["loadRoom"],
+              on: {
+                  UP: {
+                      target: "roof",
+                      actions: ["transitionUp"]
+                  },
+                  DOWN: {
+                      target: "home",
+                      actions: ["transitionDown"]
+                  }
+              }
+          },
+          roof: {
+              entry: ["loadRoom"],
+              on: {
+                  DOWN: {
+                      target: "attic",
+                      actions: ["transitionDown"]
+                  }
+              }
+          }
+      }
+  }, {
+      actions: {
+          loadRoom: (context, event, meta) => {
+              if (event.type === "xstate.init") {
+                  updateCube(context);
+                  return;
+              }
+              const target = event.type;
+              context.content[target] = meta.state.value.toString();
+              updateCube(context, () => {
+                  context.doAnimation = false;
+                  updateCube(context);
+                  context.content.FRONT = context.content[target];
+                  context.rotate.x = 0;
+                  context.rotate.y = 0;
+                  updateCube(context);
+                  setTimeout(() => {
+                      context.doAnimation = true;
+                      context.content[target] = '';
+                      updateCube(context);
+                      context.resetInputStop();
+                  }, 1);
+              });
+          },
+          transitionUp: (context, event, meta) => {
+              context.rotate.x = -90;
+              updateCube(context);
+          },
+          transitionDown: (context, event, meta) => {
+              context.rotate.x = 90;
+              updateCube(context);
+          },
+          transitionLeft: (context, event, meta) => {
+              context.rotate.y = 90;
+              updateCube(context);
+          },
+          transitionRight: (context, event, meta) => {
+              context.rotate.y = -90;
+              updateCube(context);
+          }
+      }
+  });
+
+  const setupKeyboardControls = (ctx) => {
+      document.addEventListener("keydown", ev => {
+          if (ctx.swallowInput) {
+              return;
+          }
+          const key = ev.code;
+          if (key === "ArrowUp") {
+              ctx.roomService.send("UP");
+          }
+          else if (key === "ArrowDown") {
+              ctx.roomService.send("DOWN");
+          }
+          else if (key === "ArrowLeft") {
+              ctx.roomService.send("LEFT");
+          }
+          else if (key === "ArrowRight") {
+              ctx.roomService.send("RIGHT");
+          }
+      });
+  };
+
   var hammer = createCommonjsModule(function (module) {
   /*! Hammer.JS - v2.0.7 - 2016-04-22
    * http://hammerjs.github.io/
@@ -7066,728 +7984,54 @@
   })(window, document, 'Hammer');
   });
 
-  var crypt = createCommonjsModule(function (module) {
-  (function() {
-    var base64map
-        = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
-
-    crypt = {
-      // Bit-wise rotation left
-      rotl: function(n, b) {
-        return (n << b) | (n >>> (32 - b));
-      },
-
-      // Bit-wise rotation right
-      rotr: function(n, b) {
-        return (n << (32 - b)) | (n >>> b);
-      },
-
-      // Swap big-endian to little-endian and vice versa
-      endian: function(n) {
-        // If number given, swap endian
-        if (n.constructor == Number) {
-          return crypt.rotl(n, 8) & 0x00FF00FF | crypt.rotl(n, 24) & 0xFF00FF00;
-        }
-
-        // Else, assume array and swap all items
-        for (var i = 0; i < n.length; i++)
-          n[i] = crypt.endian(n[i]);
-        return n;
-      },
-
-      // Generate an array of any length of random bytes
-      randomBytes: function(n) {
-        for (var bytes = []; n > 0; n--)
-          bytes.push(Math.floor(Math.random() * 256));
-        return bytes;
-      },
-
-      // Convert a byte array to big-endian 32-bit words
-      bytesToWords: function(bytes) {
-        for (var words = [], i = 0, b = 0; i < bytes.length; i++, b += 8)
-          words[b >>> 5] |= bytes[i] << (24 - b % 32);
-        return words;
-      },
-
-      // Convert big-endian 32-bit words to a byte array
-      wordsToBytes: function(words) {
-        for (var bytes = [], b = 0; b < words.length * 32; b += 8)
-          bytes.push((words[b >>> 5] >>> (24 - b % 32)) & 0xFF);
-        return bytes;
-      },
-
-      // Convert a byte array to a hex string
-      bytesToHex: function(bytes) {
-        for (var hex = [], i = 0; i < bytes.length; i++) {
-          hex.push((bytes[i] >>> 4).toString(16));
-          hex.push((bytes[i] & 0xF).toString(16));
-        }
-        return hex.join('');
-      },
-
-      // Convert a hex string to a byte array
-      hexToBytes: function(hex) {
-        for (var bytes = [], c = 0; c < hex.length; c += 2)
-          bytes.push(parseInt(hex.substr(c, 2), 16));
-        return bytes;
-      },
-
-      // Convert a byte array to a base-64 string
-      bytesToBase64: function(bytes) {
-        for (var base64 = [], i = 0; i < bytes.length; i += 3) {
-          var triplet = (bytes[i] << 16) | (bytes[i + 1] << 8) | bytes[i + 2];
-          for (var j = 0; j < 4; j++)
-            if (i * 8 + j * 6 <= bytes.length * 8)
-              base64.push(base64map.charAt((triplet >>> 6 * (3 - j)) & 0x3F));
-            else
-              base64.push('=');
-        }
-        return base64.join('');
-      },
-
-      // Convert a base-64 string to a byte array
-      base64ToBytes: function(base64) {
-        // Remove non-base-64 characters
-        base64 = base64.replace(/[^A-Z0-9+\/]/ig, '');
-
-        for (var bytes = [], i = 0, imod4 = 0; i < base64.length;
-            imod4 = ++i % 4) {
-          if (imod4 == 0) continue;
-          bytes.push(((base64map.indexOf(base64.charAt(i - 1))
-              & (Math.pow(2, -2 * imod4 + 8) - 1)) << (imod4 * 2))
-              | (base64map.indexOf(base64.charAt(i)) >>> (6 - imod4 * 2)));
-        }
-        return bytes;
-      }
-    };
-
-    module.exports = crypt;
-  })();
-  });
-
-  var charenc = {
-    // UTF-8 encoding
-    utf8: {
-      // Convert a string to a byte array
-      stringToBytes: function(str) {
-        return charenc.bin.stringToBytes(unescape(encodeURIComponent(str)));
-      },
-
-      // Convert a byte array to a string
-      bytesToString: function(bytes) {
-        return decodeURIComponent(escape(charenc.bin.bytesToString(bytes)));
-      }
-    },
-
-    // Binary encoding
-    bin: {
-      // Convert a string to a byte array
-      stringToBytes: function(str) {
-        for (var bytes = [], i = 0; i < str.length; i++)
-          bytes.push(str.charCodeAt(i) & 0xFF);
-        return bytes;
-      },
-
-      // Convert a byte array to a string
-      bytesToString: function(bytes) {
-        for (var str = [], i = 0; i < bytes.length; i++)
-          str.push(String.fromCharCode(bytes[i]));
-        return str.join('');
-      }
-    }
+  const setupSwipeControls = (ctx) => {
+      const hammer$1 = new hammer(document.body);
+      hammer$1.get('swipe').set({
+          direction: hammer.DIRECTION_ALL
+      });
+      // listen to events...
+      hammer$1.on("swipeup", (ev) => {
+          if (ev.pointerType !== 'touch') {
+              return;
+          }
+          if (ctx.swallowInput) {
+              return;
+          }
+          ctx.roomService.send('DOWN');
+      });
+      hammer$1.on("swipedown", (ev) => {
+          if (ev.pointerType !== 'touch') {
+              return;
+          }
+          if (ctx.swallowInput) {
+              return;
+          }
+          ctx.roomService.send('UP');
+      });
+      hammer$1.on("swipeleft", (ev) => {
+          if (ev.pointerType !== 'touch') {
+              return;
+          }
+          if (ctx.swallowInput) {
+              return;
+          }
+          ctx.roomService.send('RIGHT');
+      });
+      hammer$1.on("swiperight", (ev) => {
+          if (ev.pointerType !== 'touch') {
+              return;
+          }
+          if (ctx.swallowInput) {
+              return;
+          }
+          ctx.roomService.send('LEFT');
+      });
   };
 
-  var charenc_1 = charenc;
-
-  var sha1 = createCommonjsModule(function (module) {
-  (function() {
-    var crypt$1 = crypt,
-        utf8 = charenc_1.utf8,
-        bin = charenc_1.bin,
-
-    // The core
-    sha1 = function (message) {
-      // Convert to byte array
-      if (message.constructor == String)
-        message = utf8.stringToBytes(message);
-      else if (typeof Buffer !== 'undefined' && typeof Buffer.isBuffer == 'function' && Buffer.isBuffer(message))
-        message = Array.prototype.slice.call(message, 0);
-      else if (!Array.isArray(message))
-        message = message.toString();
-
-      // otherwise assume byte array
-
-      var m  = crypt$1.bytesToWords(message),
-          l  = message.length * 8,
-          w  = [],
-          H0 =  1732584193,
-          H1 = -271733879,
-          H2 = -1732584194,
-          H3 =  271733878,
-          H4 = -1009589776;
-
-      // Padding
-      m[l >> 5] |= 0x80 << (24 - l % 32);
-      m[((l + 64 >>> 9) << 4) + 15] = l;
-
-      for (var i = 0; i < m.length; i += 16) {
-        var a = H0,
-            b = H1,
-            c = H2,
-            d = H3,
-            e = H4;
-
-        for (var j = 0; j < 80; j++) {
-
-          if (j < 16)
-            w[j] = m[i + j];
-          else {
-            var n = w[j - 3] ^ w[j - 8] ^ w[j - 14] ^ w[j - 16];
-            w[j] = (n << 1) | (n >>> 31);
-          }
-
-          var t = ((H0 << 5) | (H0 >>> 27)) + H4 + (w[j] >>> 0) + (
-                  j < 20 ? (H1 & H2 | ~H1 & H3) + 1518500249 :
-                  j < 40 ? (H1 ^ H2 ^ H3) + 1859775393 :
-                  j < 60 ? (H1 & H2 | H1 & H3 | H2 & H3) - 1894007588 :
-                           (H1 ^ H2 ^ H3) - 899497514);
-
-          H4 = H3;
-          H3 = H2;
-          H2 = (H1 << 30) | (H1 >>> 2);
-          H1 = H0;
-          H0 = t;
-        }
-
-        H0 += a;
-        H1 += b;
-        H2 += c;
-        H3 += d;
-        H4 += e;
-      }
-
-      return [H0, H1, H2, H3, H4];
-    },
-
-    // Public API
-    api = function (message, options) {
-      var digestbytes = crypt$1.wordsToBytes(sha1(message));
-      return options && options.asBytes ? digestbytes :
-          options && options.asString ? bin.bytesToString(digestbytes) :
-          crypt$1.bytesToHex(digestbytes);
-    };
-
-    api._blocksize = 16;
-    api._digestsize = 20;
-
-    module.exports = api;
-  })();
-  });
-
-  var hash = createCommonjsModule(function (module, exports) {
-  var __importDefault = (commonjsGlobal && commonjsGlobal.__importDefault) || function (mod) {
-      return (mod && mod.__esModule) ? mod : { "default": mod };
-  };
-  Object.defineProperty(exports, "__esModule", { value: true });
-  const sha1_1 = __importDefault(sha1);
-  // This is used to ensure that no hash begins with a number, since CSS selectors cant start with numbers
-  const prefix = 'brynja-';
-  exports.objHash = (obj) => prefix + sha1_1.default(JSON.stringify(obj));
-  });
-
-  unwrapExports(hash);
-  var hash_1 = hash.objHash;
-
-  var builder = createCommonjsModule(function (module, exports) {
-  Object.defineProperty(exports, "__esModule", { value: true });
-
-  exports.newVNode = (ctx = {}) => (Object.assign({ tag: '', value: null, text: '', events: {}, props: {}, children: [] }, ctx));
-  function buildNode(tagType, builder, customOperations) {
-      const ctx = exports.newVNode({
-          tag: tagType,
-      });
-      let styles = {};
-      const builderCtx = Object.assign({ style(styleObject) {
-              const styleHash = hash.objHash(styleObject);
-              styles[styleHash] = styleObject;
-              this.class([styleHash]);
-              return this;
-          },
-          on(eventName, handler) {
-              if (eventName in ctx.events) {
-                  ctx.events[eventName].push(handler);
-              }
-              else {
-                  ctx.events[eventName] = [handler];
-              }
-              return this;
-          },
-          child(tagType, builder) {
-              const [child, childStyles] = buildNode(tagType, builder, customOperations);
-              ctx.children.push(child);
-              styles = Object.assign(Object.assign({}, styles), childStyles);
-              return this;
-          },
-          children(tagType, count, builder) {
-              for (let __i = 0; __i < count; __i++) {
-                  const [child, childStyles] = buildNode(tagType, (_) => builder(_, __i), customOperations);
-                  ctx.children.push(child);
-                  styles = Object.assign(Object.assign({}, styles), childStyles);
-              }
-              return this;
-          },
-          when(booleanExpression, then_builder, else_builder) {
-              if (booleanExpression) {
-                  then_builder(this);
-              }
-              else if (else_builder) {
-                  else_builder(this);
-              }
-              return this;
-          },
-          while(predicate, builder) {
-              for (let i = 0; predicate(i); i++) {
-                  builder(this, i);
-              }
-              return this;
-          },
-          do(...builders) {
-              builders.forEach((builder) => builder(this));
-              return this;
-          },
-          value(value) {
-              ctx.value = value;
-              return this;
-          },
-          text(value) {
-              ctx.text = value;
-              return this;
-          },
-          prop(key, value) {
-              ctx.props[key] = value;
-              return this;
-          },
-          id(value) {
-              ctx.props.id = value;
-              return this;
-          },
-          class(valuesArr) {
-              if (!('class' in ctx.props)) {
-                  ctx.props.class = valuesArr.join(' ');
-              }
-              else {
-                  ctx.props.class = [...ctx.props.class.split(' '), ...valuesArr].join(' ');
-              }
-              return this;
-          },
-          name(value) {
-              ctx.props.name = value;
-              return this;
-          },
-          peek(callback) {
-              function ctxProxy(ctx) {
-                  return {
-                      tag: ctx.tag,
-                      text: ctx.text,
-                      value: ctx.value,
-                      props: ctx.props,
-                      events: ctx.events,
-                      children: new Proxy([], {
-                          get: (arr, key) => {
-                              if (key === 'length') {
-                                  return ctx.children.length;
-                              }
-                              else if (!isNaN(parseFloat(key.toString()))) {
-                                  return ctxProxy(ctx.children[key]);
-                              }
-                              else {
-                                  return arr[key];
-                              }
-                          },
-                      }),
-                  };
-              }
-              callback(ctxProxy(ctx));
-              return this;
-          } }, Object.keys(customOperations).reduce((res, k) => (Object.assign(Object.assign({}, res), { [k]: (...args) => {
-              customOperations[k](...args)(builderCtx);
-              return builderCtx;
-          } })), {}));
-      builder(builderCtx);
-      return [ctx, styles];
-  }
-  exports.buildNode = buildNode;
-  });
-
-  unwrapExports(builder);
-  var builder_1 = builder.newVNode;
-  var builder_2 = builder.buildNode;
-
-  var renderNode_1 = createCommonjsModule(function (module, exports) {
-  Object.defineProperty(exports, "__esModule", { value: true });
-  function renderNode(node) {
-      const elem = document.createElement(node.tag);
-      if (node.value) {
-          // @ts-ignore
-          elem.value = node.value;
-          elem.setAttribute('value', '' + node.value);
-      }
-      if (node.text !== '') {
-          const $text = document.createTextNode(node.text);
-          elem.appendChild($text);
-      }
-      Object.keys(node.props).forEach((prop) => {
-          elem.setAttribute(prop, node.props[prop]);
-      });
-      Object.keys(node.events).forEach((event) => {
-          elem.addEventListener(event, (e) => {
-              node.events[event].forEach((cb) => {
-                  cb(e);
-              });
-          });
-      });
-      node.children.forEach((node) => {
-          elem.appendChild(renderNode(node));
-      });
-      return elem;
-  }
-  exports.renderNode = renderNode;
-  });
-
-  unwrapExports(renderNode_1);
-  var renderNode_2 = renderNode_1.renderNode;
-
-  var renderStyles = createCommonjsModule(function (module, exports) {
-  Object.defineProperty(exports, "__esModule", { value: true });
-  function renderStyle(styles) {
-      const renderedStyles = Object.keys(styles).reduce((res, className) => {
-          const allSelectors = Object.keys(styles[className]).reduce((res, key) => {
-              if (key.startsWith(':')) {
-                  // Extract pseudoClasses
-                  res[className + key] = styles[className][key];
-              }
-              else {
-                  // Pass the property along
-                  res[className] = Object.assign(Object.assign({}, res[className]), { [key]: styles[className][key] });
-              }
-              return res;
-          }, {});
-          const renderStyleObject = (className, styleObj) => {
-              return `.${className}{${Object.keys(styleObj).map((k) => `${k}: ${styleObj[k]};`).join('')}}`;
-          };
-          // Render all styles for the current className (including pseudo selectors)
-          Object.keys(allSelectors).forEach((selector) => {
-              res += renderStyleObject(selector, allSelectors[selector]);
-          });
-          return res;
-      }, '');
-      return renderedStyles;
-  }
-  exports.renderStyle = renderStyle;
-  });
-
-  unwrapExports(renderStyles);
-  var renderStyles_1 = renderStyles.renderStyle;
-
-  var updateNode_1 = createCommonjsModule(function (module, exports) {
-  Object.defineProperty(exports, "__esModule", { value: true });
-
-  const TEXT_NODE = 3; // https://developer.mozilla.org/en-US/docs/Web/API/Node/nodeType
-  function updateNode(newNode, oldNode, elem) {
-      if (newNode.tag.toLowerCase() !== oldNode.tag.toLowerCase()) {
-          // Different tags requires a re-render
-          const newElem = renderNode_1.renderNode(newNode);
-          elem.parentNode.replaceChild(newElem, elem);
-      }
-      // #region Update value
-      if (newNode.value && newNode.value !== oldNode.value) {
-          // @ts-ignore
-          elem.value = newNode.value;
-          elem.setAttribute('value', '' + newNode.value);
-      }
-      else if (newNode.value !== oldNode.value) {
-          // @ts-ignore
-          elem.value = undefined;
-          elem.removeAttribute('value');
-      }
-      // #endregion
-      // #region Update text node
-      if (oldNode.text === newNode.text) ;
-      else if (oldNode.text === '' && newNode.text !== '') {
-          // Add text
-          const $text = document.createTextNode(newNode.text);
-          elem.appendChild($text);
-      }
-      else if (oldNode.text !== '') {
-          if (elem.firstChild.nodeType !== TEXT_NODE) {
-              // This should never happen. So no need to test for it?
-              /* istanbul ignore next */
-              throw new Error('Unexpected "none text node" as first child of element: ' + elem);
-          }
-          if (newNode.text === '') {
-              // Remove text
-              elem.firstChild.remove();
-          }
-          else if (newNode.text !== '') {
-              // Update text
-              elem.firstChild.textContent = newNode.text;
-          }
-      }
-      // #endregion
-      // #region Update props
-      new Set([
-          ...Object.keys(oldNode.props),
-          ...Object.keys(newNode.props),
-      ]).forEach((prop) => {
-          if (prop in oldNode.props && !(prop in newNode.props)) {
-              // Remove prop
-              elem.removeAttribute(prop);
-          }
-          else if (prop in newNode.props && !(prop in oldNode.props)) {
-              // Add prop
-              elem.setAttribute(prop, newNode.props[prop]);
-          }
-          else if (prop in newNode.props && prop in oldNode.props && newNode.props[prop] !== oldNode.props[prop]) {
-              // Update prop
-              elem.setAttribute(prop, newNode.props[prop]);
-          }
-      });
-      // #endregion
-      // #region Update events
-      new Set([
-          ...Object.keys(oldNode.events),
-          ...Object.keys(newNode.events),
-      ]).forEach((event) => {
-          if (event in oldNode.events && !(event in newNode.events)) {
-              // Remove all listeners
-              oldNode.events[event].forEach((cb) => {
-                  elem.removeEventListener(event, cb);
-              });
-          }
-          else if (event in newNode.events && !(event in oldNode.events)) {
-              // Add new listeners
-              newNode.events[event].forEach((cb) => {
-                  elem.addEventListener(event, cb);
-              });
-          }
-          else if (event in newNode.events && event in oldNode.events) {
-              // Some listeners might have changed
-              for (let i = 0; i < Math.max(oldNode.events[event].length, newNode.events[event].length); i++) {
-                  const oldHandler = oldNode.events[event][i];
-                  const newHandler = newNode.events[event][i];
-                  // Naively compare function signatures between oldNode and newNode to limit nr of assignments each render
-                  if (oldHandler.toString() !== newHandler.toString()) {
-                      elem.removeEventListener(event, oldHandler);
-                      elem.addEventListener(event, newHandler);
-                  }
-              }
-          }
-      });
-      // #endregion
-      // #region Update children
-      for (let i = 0; i < newNode.children.length; i++) {
-          if (i < oldNode.children.length) {
-              // Updated elements compared to previous nodeTree
-              updateNode(newNode.children[i], oldNode.children[i], elem.children.item(i));
-          }
-          else {
-              // Create new elements
-              elem.appendChild(renderNode_1.renderNode(newNode.children[i]));
-          }
-      }
-      const firstInvalidIndex = newNode.children.length;
-      const elementsToRemove = elem.children.length - firstInvalidIndex;
-      for (let i = 0; i < elementsToRemove; i++) {
-          // Remove extra elements
-          elem.children.item(firstInvalidIndex).remove();
-      }
-      // #endregion
-  }
-  exports.updateNode = updateNode;
-  });
-
-  unwrapExports(updateNode_1);
-  var updateNode_2 = updateNode_1.updateNode;
-
-  var renderer = createCommonjsModule(function (module, exports) {
-  Object.defineProperty(exports, "__esModule", { value: true });
-
-
-
-
-  function Renderer(config) {
-      let initialRender = true;
-      let oldRootNode = null;
-      const customOperations = {};
-      return {
-          render(rootBuilder) {
-              const [rootNode, styles] = builder.buildNode(config.rootElement.tagName.toLowerCase(), rootBuilder, customOperations);
-              // Append styles if needed
-              if (Object.keys(styles).length > 0) {
-                  rootNode.children.push(builder.newVNode({
-                      tag: 'style',
-                      text: renderStyles.renderStyle(styles),
-                      props: {
-                          type: 'text/css',
-                      },
-                  }));
-              }
-              // Render / Update HTML
-              if (initialRender) {
-                  initialRender = false;
-                  const newRoot = renderNode_1.renderNode(rootNode);
-                  config.rootElement.replaceWith(newRoot);
-                  config.rootElement = newRoot;
-              }
-              else {
-                  updateNode_1.updateNode(rootNode, oldRootNode, config.rootElement);
-              }
-              // Update refs for next render
-              oldRootNode = rootNode;
-          },
-          extend(operationName, constructor) {
-              customOperations[operationName] = constructor;
-          },
-      };
-  }
-  exports.Renderer = Renderer;
-  });
-
-  unwrapExports(renderer);
-  var renderer_1 = renderer.Renderer;
-
-  var events = createCommonjsModule(function (module, exports) {
-  // Events: https://www.w3schools.com/tags/ref_eventattributes.asp
-  Object.defineProperty(exports, "__esModule", { value: true });
-  // tslint:disable-next-line no-namespace
-  var Events;
-  (function (Events) {
-      let Mouse;
-      (function (Mouse) {
-          Mouse["Click"] = "click";
-          Mouse["DoubleClick"] = "dblclick";
-          Mouse["Down"] = "mousedown";
-          Mouse["Up"] = "mouseup";
-          Mouse["Move"] = "mousemove";
-          Mouse["Out"] = "mouseout";
-          Mouse["Over"] = "mouseover";
-          Mouse["Wheel"] = "wheel";
-      })(Mouse = Events.Mouse || (Events.Mouse = {}));
-      let Keyboard;
-      (function (Keyboard) {
-          Keyboard["Down"] = "keydown";
-          Keyboard["Up"] = "keyup";
-          Keyboard["Press"] = "keypress";
-      })(Keyboard = Events.Keyboard || (Events.Keyboard = {}));
-      let Drag;
-      (function (Drag) {
-          Drag["Drag"] = "drag";
-          Drag["End"] = "dragend";
-          Drag["Enter"] = "dragenter";
-          Drag["Leave"] = "dragleave";
-          Drag["Over"] = "dragover";
-          Drag["Start"] = "dragstart";
-          Drag["Drop"] = "drop";
-          Drag["Scroll"] = "scroll";
-      })(Drag = Events.Drag || (Events.Drag = {}));
-      let Clipboard;
-      (function (Clipboard) {
-          Clipboard["Copy"] = "copy";
-          Clipboard["Cut"] = "cut";
-          Clipboard["Paste"] = "paste";
-      })(Clipboard = Events.Clipboard || (Events.Clipboard = {}));
-  })(Events = exports.Events || (exports.Events = {}));
-  });
-
-  unwrapExports(events);
-  var events_1 = events.Events;
-
-  var brynja = createCommonjsModule(function (module, exports) {
-  Object.defineProperty(exports, "__esModule", { value: true });
-
-
-  exports.Events = events.Events;
-  var renderer_2 = renderer;
-  exports.Renderer = renderer_2.Renderer;
-  const defaultRenderer = (() => {
-      let default_renderer = null;
-      return () => {
-          if (default_renderer === null) {
-              // This makes sure the dom is ready when the Renderer is constructed.
-              default_renderer = renderer.Renderer({
-                  rootElement: document.getElementById('root'),
-              });
-          }
-          return default_renderer;
-      };
-  })();
-  // Because the tests run asynchronous its typically unreliable to test the extend functionality of the default renderer.
-  /* istanbul ignore next */
-  exports.extend = (operationName, constructor) => defaultRenderer().extend(operationName, constructor);
-  exports.render = (rootBuilder) => defaultRenderer().render(rootBuilder);
-  });
-
-  unwrapExports(brynja);
-  var brynja_1 = brynja.Events;
-  var brynja_2 = brynja.Renderer;
-  var brynja_3 = brynja.extend;
-  var brynja_4 = brynja.render;
-
-  const buildHome = (_) => _
-      .child('h1', _ => _
-      .class(['heading'])
-      .text('Living Room'));
-
-  const rooms = {
-      'home': buildHome
-  };
-  brynja_3('setContent', (contentKey) => _ => {
-      const found = contentKey in rooms;
-      if (found) {
-          return rooms[contentKey](_);
-      }
-      else {
-          // Default fallback builder
-          return _
-              .child('h1', _ => _
-              .class(['heading'])
-              .text(contentKey));
-      }
-  });
-  const updateCube = (state, onTransitioned = () => { }) => {
-      brynja_4(_ => _
-          .prop('style', `
-      --rotationX: ${state.rotate.x}deg;
-      --rotationY: ${state.rotate.y}deg;
-    `)
-          .id('wrapper')
-          .child('div', _ => _
-          .class(['cube'])
-          .when(state.doAnimation, _ => _
-          .class(['animate']))
-          .on('transitionend', onTransitioned)
-          .child('div', _ => _
-          .id('front')
-          .setContent(state.content.FRONT))
-          .child('div', _ => _
-          .id('left')
-          .setContent(state.content.LEFT))
-          .child('div', _ => _
-          .id('right')
-          .setContent(state.content.RIGHT))
-          .child('div', _ => _
-          .id('top')
-          .setContent(state.content.UP))
-          .child('div', _ => _
-          .id('bottom')
-          .setContent(state.content.DOWN))));
-  };
-
-  // Stateless machine definition
-  const roomMachine = Machine({
-      id: "rooms",
-      initial: "home",
-      context: {
+  const ctx = {
+      swallowInput: false,
+      roomService: interpret(roomMachine
+          .withContext({
           doAnimation: true,
           content: {
               FRONT: 'home',
@@ -7800,252 +8044,17 @@
               x: 0,
               y: 0,
           },
-          resetInputStop: () => { },
-      },
-      states: {
-          home: {
-              entry: ["loadRoom"],
-              on: {
-                  UP: {
-                      target: "attic",
-                      actions: ["transitionUp"]
-                  },
-                  LEFT: {
-                      target: "porch",
-                      actions: ["transitionLeft"]
-                  },
-                  RIGHT: {
-                      target: "yard",
-                      actions: ["transitionRight"]
-                  },
-                  DOWN: {
-                      target: "basement",
-                      actions: ["transitionDown"]
-                  }
-              }
+          resetInputStop: () => {
+              ctx.swallowInput = false;
           },
-          basement: {
-              entry: ["loadRoom"],
-              on: {
-                  UP: {
-                      target: "home",
-                      actions: ["transitionUp"]
-                  },
-                  DOWN: {
-                      target: "secret laboratory",
-                      actions: ["transitionDown"]
-                  }
-              }
-          },
-          "secret laboratory": {
-              entry: ["loadRoom"],
-              on: {
-                  UP: {
-                      target: "basement",
-                      actions: ["transitionUp"]
-                  },
-                  LEFT: {
-                      target: "room of vials",
-                      actions: ["transitionLeft"]
-                  },
-                  RIGHT: {
-                      target: "prison cells",
-                      actions: ["transitionRight"]
-                  }
-              }
-          },
-          "room of vials": {
-              entry: ["loadRoom"],
-              on: {
-                  RIGHT: {
-                      target: "secret laboratory",
-                      actions: ["transitionRight"]
-                  }
-              }
-          },
-          "prison cells": {
-              entry: ["loadRoom"],
-              on: {
-                  LEFT: {
-                      target: "secret laboratory",
-                      actions: ["transitionLeft"]
-                  }
-              }
-          },
-          porch: {
-              entry: ["loadRoom"],
-              on: {
-                  RIGHT: {
-                      target: "home",
-                      actions: ["transitionRight"]
-                  },
-                  LEFT: {
-                      target: "yard",
-                      actions: ["transitionLeft"]
-                  }
-              }
-          },
-          yard: {
-              entry: ["loadRoom"],
-              on: {
-                  LEFT: {
-                      target: "home",
-                      actions: ["transitionLeft"]
-                  },
-                  RIGHT: {
-                      target: "porch",
-                      actions: ["transitionRight"]
-                  }
-              }
-          },
-          attic: {
-              entry: ["loadRoom"],
-              on: {
-                  UP: {
-                      target: "roof",
-                      actions: ["transitionUp"]
-                  },
-                  DOWN: {
-                      target: "home",
-                      actions: ["transitionDown"]
-                  }
-              }
-          },
-          roof: {
-              entry: ["loadRoom"],
-              on: {
-                  DOWN: {
-                      target: "attic",
-                      actions: ["transitionDown"]
-                  }
-              }
+      })).onTransition(state => {
+          if (state.changed) {
+              ctx.swallowInput = true;
           }
-      }
-  }, {
-      actions: {
-          loadRoom: (context, event, meta) => {
-              if (event.type === "xstate.init") {
-                  updateCube(context);
-                  return;
-              }
-              const target = event.type;
-              context.content[target] = meta.state.value.toString();
-              updateCube(context, () => {
-                  context.doAnimation = false;
-                  updateCube(context);
-                  context.content.FRONT = context.content[target];
-                  context.rotate.x = 0;
-                  context.rotate.y = 0;
-                  updateCube(context);
-                  setTimeout(() => {
-                      context.doAnimation = true;
-                      context.content[target] = '';
-                      updateCube(context);
-                      context.resetInputStop();
-                  }, 1);
-              });
-          },
-          transitionUp: (context, event, meta) => {
-              context.rotate.x = -90;
-              updateCube(context);
-          },
-          transitionDown: (context, event, meta) => {
-              context.rotate.x = 90;
-              updateCube(context);
-          },
-          transitionLeft: (context, event, meta) => {
-              context.rotate.y = 90;
-              updateCube(context);
-          },
-          transitionRight: (context, event, meta) => {
-              context.rotate.y = -90;
-              updateCube(context);
-          }
-      }
-  });
-
-  let swallowInput = false;
-  const roomService = interpret(roomMachine
-      .withContext({
-      doAnimation: true,
-      content: {
-          FRONT: 'home',
-          LEFT: '',
-          RIGHT: '',
-          UP: '',
-          DOWN: '',
-      },
-      rotate: {
-          x: 0,
-          y: 0,
-      },
-      resetInputStop: () => {
-          swallowInput = false;
-      },
-  })).onTransition(state => {
-      if (state.changed) {
-          swallowInput = true;
-      }
-  })
-      .start();
-  const hammer$1 = new hammer(document.body);
-  hammer$1.get('swipe').set({
-      direction: hammer.DIRECTION_ALL
-  });
-  // listen to events...
-  hammer$1.on("swipeup", (ev) => {
-      if (ev.pointerType !== 'touch') {
-          return;
-      }
-      if (swallowInput) {
-          return;
-      }
-      roomService.send('DOWN');
-  });
-  hammer$1.on("swipedown", (ev) => {
-      if (ev.pointerType !== 'touch') {
-          return;
-      }
-      if (swallowInput) {
-          return;
-      }
-      roomService.send('UP');
-  });
-  hammer$1.on("swipeleft", (ev) => {
-      if (ev.pointerType !== 'touch') {
-          return;
-      }
-      if (swallowInput) {
-          return;
-      }
-      roomService.send('RIGHT');
-  });
-  hammer$1.on("swiperight", (ev) => {
-      if (ev.pointerType !== 'touch') {
-          return;
-      }
-      if (swallowInput) {
-          return;
-      }
-      roomService.send('LEFT');
-  });
-  document.addEventListener("keydown", ev => {
-      if (swallowInput) {
-          return;
-      }
-      const key = ev.code;
-      if (key === "ArrowUp") {
-          roomService.send("UP");
-      }
-      else if (key === "ArrowDown") {
-          roomService.send("DOWN");
-      }
-      else if (key === "ArrowLeft") {
-          roomService.send("LEFT");
-      }
-      else if (key === "ArrowRight") {
-          roomService.send("RIGHT");
-      }
-  });
+      })
+          .start(),
+  };
+  setupSwipeControls(ctx);
+  setupKeyboardControls(ctx);
 
 }());

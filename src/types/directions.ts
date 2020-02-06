@@ -1,0 +1,1 @@
+export type Directions = 'FRONT' | 'LEFT' | 'RIGHT' | 'UP' | 'DOWN';

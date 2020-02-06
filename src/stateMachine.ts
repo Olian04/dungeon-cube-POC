@@ -1,5 +1,6 @@
 import { Machine } from 'xstate/es';
 import { updateCube } from './updateCube';
+import { Directions } from  './types/directions';
 
 // Stateless machine definition
 export const roomMachine = Machine(
@@ -149,7 +150,7 @@ export const roomMachine = Machine(
           return;
         }
 
-        const target = event.type;
+        const target = event.type as Directions;
 
         context.content[target] = meta.state.value.toString();
         updateCube(context, () => {

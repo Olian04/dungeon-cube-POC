@@ -1,3 +1,4 @@
+import { BuilderCTX } from 'brynja/dist/builder';
 import { render, extend } from 'brynja';
 import { buildHome } from './rooms/home';
 
@@ -20,10 +21,10 @@ const rooms = {
   'home': buildHome
 }
 
-extend('setContent', (contentKey: string) => _=> {
-  const found = contentKey in rooms;
-  if (found) {
-    return rooms[contentKey](_);
+const setContent = (contentKey: string) => (_: BuilderCTX)=> {
+  if (contentKey in rooms) {
+    const roomName = contentKey as keyof typeof rooms;
+    return rooms[roomName](_);
   } else {
 
     // Default fallback builder
@@ -33,7 +34,7 @@ extend('setContent', (contentKey: string) => _=> {
         .text(contentKey)
       );
   }
-});
+};
 
 export const updateCube = (state: IState, onTransitioned: (ev: Event) => void = () => {}) => {
   render(_=>_
@@ -50,23 +51,23 @@ export const updateCube = (state: IState, onTransitioned: (ev: Event) => void = 
       .on('transitionend', onTransitioned)
       .child('div', _=>_
         .id('front')
-        .setContent(state.content.FRONT)
+        .do(setContent(state.content.FRONT))
       )
       .child('div', _=>_
         .id('left')
-        .setContent(state.content.LEFT)
+        .do(setContent(state.content.LEFT))
       )
       .child('div', _=>_
         .id('right')
-        .setContent(state.content.RIGHT)
+        .do(setContent(state.content.RIGHT))
       )
       .child('div', _=>_
         .id('top')
-        .setContent(state.content.UP)
+        .do(setContent(state.content.UP))
       )
       .child('div', _=>_
         .id('bottom')
-        .setContent(state.content.DOWN)
+        .do(setContent(state.content.DOWN))
       )
     )
   )
